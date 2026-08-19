@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Span Offset Debugger - see one span land on four different substrings</title>
+<meta name="description" content="Paste text and a span, name the system that produced the offsets and the one that reads them, and see the same numbers select four different substrings under UTF-16, code point, UTF-8 byte and grapheme cluster indexing.">
+<link rel="canonical" href="https://0xelitesystem.github.io/span-offset-debugger/">
+<meta property="og:title" content="Span Offset Debugger">
+<meta property="og:description" content="Paste text and a span, name the producing and consuming system, and see the same offsets select four different substrings.">
+<meta property="og:url" content="https://0xelitesystem.github.io/span-offset-debugger/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230d2b2e'/><text x='50' y='72' font-size='62' text-anchor='middle' fill='%235ec8c4' font-family='monospace'>[ )</text></svg>">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Span Offset Debugger","applicationCategory":"DeveloperApplication","operatingSystem":"Any (browser)","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"url":"https://0xelitesystem.github.io/span-offset-debugger/","author":{"@type":"Person","name":"0xelitesystem","url":"https://elitesystem.ai"}}
+</script>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('sod-theme');
+    if (t === 'light' || t === 'dark') { document.documentElement.setAttribute('data-theme', t); }
+  } catch (e) { /* storage blocked; dark stays the default */ }
+})();
+</script>
+<style>
+:root, :root[data-theme="dark"] {
+  --bg: #0b1719;
+  --surface: #102426;
+  --surface-2: #0d1d1f;
+  --ink: #e6ece9;
+  --ink-soft: #adc0bd;
+  --ink-faint: #7d9391;
+  --rule: #24403f;
+  --accent: #5ec8c4;
+  --accent-deep: #86ded9;
+  --ok: #6fd08a;
+  --warn: #e0b05e;
+  --err: #ef8a86;
+  --code-bg: #081416;
+  --a16: rgba(96, 148, 232, 0.34);
+  --a16s: #86adf0;
+  --acp: rgba(178, 128, 224, 0.34);
+  --acps: #c39ded;
+  --a8: rgba(214, 158, 74, 0.34);
+  --a8s: #e6b673;
+  --agr: rgba(96, 196, 128, 0.34);
+  --agrs: #78d49a;
+}
+:root[data-theme="light"] {
+  --bg: #f7f8f6;
+  --surface: #ffffff;
+  --surface-2: #eef1ee;
+  --ink: #0d1f21;
+  --ink-soft: #37504f;
+  --ink-faint: #5f7573;
+  --rule: #ccd8d6;
+  --accent: #0f5f62;
+  --accent-deep: #0a4547;
+  --ok: #1c6b38;
+  --warn: #8a5c07;
+  --err: #9a2320;
+  --code-bg: #eceee9;
+  --a16: rgba(60, 110, 200, 0.24);
+  --a16s: #2f5fb0;
+  --acp: rgba(140, 84, 194, 0.24);
+  --acps: #7440ac;
+  --a8: rgba(196, 132, 30, 0.28);
+  --a8s: #9a6408;
+  --agr: rgba(46, 154, 84, 0.24);
+  --agrs: #1c7040;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.55;
+  padding: 1.5rem 1rem 3rem;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+code, pre, .mono, textarea, .lane-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+header.top {
+  display: flex; flex-wrap: wrap; gap: 0.75rem;
+  align-items: baseline; justify-content: space-between;
+  border-bottom: 2px solid var(--accent); padding-bottom: 0.9rem; margin-bottom: 1.1rem;
+}
+h1 { font-size: 1.6rem; line-height: 1.2; letter-spacing: -0.01em; color: var(--accent-deep); }
+h2 { font-size: 1.12rem; margin: 1.9rem 0 0.6rem; color: var(--accent-deep); }
+h3 { font-size: 0.98rem; margin: 1.1rem 0 0.4rem; color: var(--ink); }
+p { margin: 0.55rem 0; }
+a { color: var(--accent-deep); }
+.sub { color: var(--ink-soft); font-size: 0.95rem; }
+button, select, textarea, input { font: inherit; color: inherit; }
+button {
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 0.4rem 0.75rem; cursor: pointer; font-size: 0.88rem;
+}
+button:hover:enabled { border-color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+select {
+  background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 0.35rem 0.5rem; width: 100%; font-size: 0.88rem;
+}
+textarea {
+  width: 100%; background: var(--code-bg); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 0.6rem; font-size: 0.86rem; resize: vertical; line-height: 1.5;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 9px;
+  padding: 0.95rem 1rem; margin: 0.9rem 0;
+}
+.receipt { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 9px 9px 0; }
+blockquote {
+  border-left: 2px solid var(--rule); margin: 0.6rem 0; padding: 0.15rem 0 0.15rem 0.8rem;
+  color: var(--ink-soft); font-size: 0.92rem;
+}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+.grid-sel { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin-top: 0.7rem; }
+label.fld { display: block; font-size: 0.82rem; color: var(--ink-soft); margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; align-items: center; }
+.lane { border: 1px solid var(--rule); border-radius: 8px; margin: 0.7rem 0; overflow: hidden; background: var(--surface); }
+.lane-head { padding: 0.5rem 0.7rem; background: var(--surface-2); border-bottom: 1px solid var(--rule); }
+.lane-name { font-weight: 600; font-size: 0.92rem; }
+.lane-sys { font-size: 0.78rem; color: var(--ink-faint); display: block; margin-top: 0.1rem; }
+.lane-text {
+  padding: 0.7rem; font-size: 0.9rem; white-space: pre-wrap;
+  word-break: break-word; overflow-wrap: anywhere;
+}
+.lane-verdict { font-size: 0.83rem; padding: 0.4rem 0.7rem; border-top: 1px dashed var(--rule); color: var(--ink-soft); }
+p, li, td, th, .msg, .lane-verdict, .lane-sys, blockquote, label { overflow-wrap: anywhere; }
+.grid2 > div, .grid-sel > div { min-width: 0; }
+mark { color: inherit; border-radius: 2px; padding: 0.05em 0; }
+.lane-utf16 mark { background: var(--a16); box-shadow: inset 0 -2px 0 var(--a16s); }
+.lane-codepoint mark { background: var(--acp); box-shadow: inset 0 -2px 0 var(--acps); }
+.lane-utf8 mark { background: var(--a8); box-shadow: inset 0 -2px 0 var(--a8s); }
+.lane-grapheme mark { background: var(--agr); box-shadow: inset 0 -2px 0 var(--agrs); }
+.lane-utf16 .lane-name { color: var(--a16s); }
+.lane-codepoint .lane-name { color: var(--acps); }
+.lane-utf8 .lane-name { color: var(--a8s); }
+.lane-grapheme .lane-name { color: var(--agrs); }
+mark.caret { border-left: 2px solid var(--err); background: none; box-shadow: none; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.84rem; min-width: 640px; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { background: var(--surface-2); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+pre.out {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 0.7rem; font-size: 0.84rem; overflow-x: auto; white-space: pre; margin-top: 0.5rem;
+}
+.msg { border-radius: 8px; padding: 0.6rem 0.8rem; margin: 0.6rem 0; font-size: 0.88rem; border: 1px solid var(--rule); background: var(--surface); }
+.msg.err { border-color: var(--err); color: var(--err); }
+.msg.warn { border-color: var(--warn); color: var(--warn); }
+.msg.ok { border-color: var(--ok); color: var(--ok); }
+.chip { display: inline-block; font-size: 0.74rem; padding: 0.1rem 0.4rem; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-faint); margin-left: 0.35rem; white-space: nowrap; }
+.chip.bad { border-color: var(--err); color: var(--err); }
+.chip.good { border-color: var(--ok); color: var(--ok); }
+ul { margin: 0.5rem 0 0.5rem 1.1rem; }
+li { margin: 0.25rem 0; }
+.simrow { font-size: 0.82rem; color: var(--ink-soft); display: flex; gap: 0.4rem; align-items: center; margin-top: 0.6rem; flex-wrap: wrap; }
+footer { margin-top: 2.6rem; border-top: 1px solid var(--rule); padding-top: 0.9rem; font-size: 0.86rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; color: var(--ink-faint); }
+.srcnote { font-size: 0.8rem; color: var(--ink-faint); word-break: break-word; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .grid2, .grid-sel { grid-template-columns: 1fr; }
+  h1 { font-size: 1.32rem; }
+  body { padding: 1rem 0.7rem 2.5rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>Span Offset Debugger</h1>
+  <button id="themeBtn" type="button" aria-label="Toggle colour theme">Light theme</button>
+</header>
+
+<p class="sub">Your model returned <code>start 43, end 49</code>. Four systems read that as four different substrings. This page shows you which one your text actually produces.</p>
+
+<div class="card receipt">
+  <p><strong>The Language Server Protocol had to negotiate this.</strong> LSP 3.17 added a <code>positionEncoding</code> capability so a client and a server can agree on what a character offset counts, because they were not agreeing. From the specification:</p>
+  <blockquote>Prior to 3.17 the offsets were always based on a UTF-16 string representation.</blockquote>
+  <blockquote>Since 3.17 clients and servers can agree on a different string encoding representation (e.g. UTF-8).</blockquote>
+  <blockquote>To stay backwards compatible the only mandatory encoding is UTF-16 represented via the string <code>utf-16</code>.</blockquote>
+  <blockquote>Implementation considerations: since the conversion from one encoding into another requires the content of the file / line the conversion is best done where the file is read which is usually on the server side.</blockquote>
+  <p class="srcnote">Language Server Protocol Specification 3.17, Text Documents / Position. <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocuments">microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocuments</a></p>
+  <p>Every major editor implements LSP. The protocol still needed a negotiated capability, a backward-compatibility clause and a note about where the conversion belongs, all for one integer. Your model, your tokenizer, your redactor and your highlighter negotiate nothing.</p>
+</div>
+
+<h2>Input</h2>
+<div class="card">
+  <div class="grid2">
+    <div>
+      <label class="fld" for="srcText">Source text</label>
+      <textarea id="srcText" rows="5" spellcheck="false" aria-describedby="srcHelp"></textarea>
+      <p class="srcnote" id="srcHelp">Exactly the string the offsets were computed against. Trailing newlines count.</p>
+      <div class="simrow">
+        <input type="checkbox" id="crlfBox">
+        <label for="crlfBox">The source used CRLF line endings</label>
+      </div>
+      <p class="srcnote">A textarea cannot hand this page a carriage return. The HTML standard: "The algorithm for obtaining the element's API value is to return the element's raw value, with newlines normalized." (WHATWG HTML, the textarea element), and that normalization makes every line break a lone LF. Tick the box if the system that produced your offsets counted CRLF, and every line ending is measured as two code units again.</p>
+    </div>
+    <div>
+      <label class="fld" for="spanText">Spans, one per line</label>
+      <textarea id="spanText" rows="5" spellcheck="false" aria-describedby="spanHelp"></textarea>
+      <p class="srcnote" id="spanHelp">Reads <code>43,49</code>, <code>43 49</code>, <code>[43, 49]</code>, <code>{"start":43,"end":49}</code>, or a whole JSON array. A third field becomes a label. End is exclusive.</p>
+    </div>
+  </div>
+  <div class="grid-sel">
+    <div>
+      <label class="fld" for="producer">Producer: the convention these numbers are in</label>
+      <select id="producer"></select>
+    </div>
+    <div>
+      <label class="fld" for="consumer">Consumer: the convention of the system reading them</label>
+      <select id="consumer"></select>
+    </div>
+  </div>
+  <div class="btnrow">
+    <button type="button" class="primary" id="exA">Load example: one span, four substrings</button>
+    <button type="button" id="exB">Load example: the LSP surrogate pair</button>
+    <button type="button" id="exC">Load example: silent shifts</button>
+    <button type="button" id="clearBtn">Clear</button>
+  </div>
+  <div class="simrow">
+    <input type="checkbox" id="simNoSeg">
+    <label for="simNoSeg">Simulate a browser without <code>Intl.Segmenter</code> (proves the grapheme column refuses instead of guessing)</label>
+  </div>
+</div>
+
+<div id="messages"></div>
+
+<h2>The same numbers, four conventions</h2>
+<p class="sub">Every line on this page is a measurement of the text and the spans in the boxes above. None of it is a prediction about your production system.</p>
+<div id="lanes"></div>
+
+<h2>Drift per span</h2>
+<div id="driftArea"></div>
+
+<h2>Converted spans</h2>
+<p class="sub" id="convNote"></p>
+<pre class="out" id="convOut"></pre>
+<div class="btnrow">
+  <button type="button" id="copyBtn">Copy converted spans</button>
+  <span class="sub" id="copyStatus"></span>
+</div>
+
+<h2>Silent shifts in this text</h2>
+<p class="sub">Four things move every offset after them and raise nothing. Each one below is reported with the offset where the shift begins and the measured length change, rather than a bare note that two lengths differ.</p>
+<div id="shiftArea"></div>
+
+<h2>This text measured four ways</h2>
+<div class="tablewrap">
+  <table id="totalsTable">
+    <thead><tr><th>Convention</th><th class="num">Length of this text</th><th>Systems that count this way</th></tr></thead>
+    <tbody id="totalsBody"></tbody>
+  </table>
+</div>
+
+<h2>What each column is, and who said so</h2>
+<div class="card">
+  <h3>UTF-16 code units</h3>
+  <p class="sub">JavaScript strings, DOM <code>Range</code> and <code>CharacterData</code> offsets, the LSP default <code>utf-16</code>, Java, .NET, Windows APIs. Java documents it plainly: "Index values refer to char code units, so a supplementary character uses two positions in a String." (java.lang.String, Java SE 21 API documentation).</p>
+  <h3>Unicode code points</h3>
+  <p class="sub">Python 3 <code>str</code>, Go runes, LSP <code>utf-32</code>, and any counter that thinks in characters. "Strings are immutable sequences of Unicode code points." (Python documentation, Text Sequence Type - str). LSP records the equivalence: "Implementation note: these are the same as Unicode code points, so this <code>PositionEncodingKind</code> may also be used for an encoding-agnostic representation of character offsets."</p>
+  <h3>UTF-8 bytes</h3>
+  <p class="sub">Rust <code>str</code>, byte-level tokenizers, protobuf <code>string</code> fields, regex run over bytes, LSP <code>utf-8</code>. Rust refuses instead of mangling: "Panics if begin or end does not point to the starting byte offset of a character (as defined by is_char_boundary), if begin &gt; end, or if end &gt; len." (std::str). Protocol Buffers: "A string must always contain UTF-8 encoded or 7-bit ASCII text" (Language Guide proto3, Scalar Value Types).</p>
+  <h3>Grapheme clusters</h3>
+  <p class="sub">What a reader sees, and what a redaction rectangle has to cover. Unicode Standard Annex #29 "describes guidelines for determining default boundaries between certain significant text elements: user-perceived characters, words, and sentences" and notes "The default grapheme clusters are also known as extended grapheme clusters." ECMA-402 lists UAX #29 as a normative reference, which is what <code>Intl.Segmenter</code> with <code>granularity: "grapheme"</code> segments on.</p>
+  <h3>Why this column can refuse</h3>
+  <p class="sub">If <code>Intl.Segmenter</code> is missing, the grapheme column computes nothing and says so. There is no regex fallback here, because a regex approximation of grapheme clusters is wrong for exactly the ZWJ sequences, flag pairs and skin-tone modifiers this column exists for, and shipping it would reproduce the bug class this page is built to find. <code>Intl.Segmenter</code> reached Baseline newly available on 2024-04-16, supported from Chrome 87, Edge 87, Firefox 125, Safari 14.1 and Safari on iOS 14.5.</p>
+</div>
+
+<footer>
+  <a href="https://elitesystem.ai">An elitesystem.ai tool</a>
+  <a href="https://github.com/0xelitesystem/span-offset-debugger">Source</a>
+  <a href="https://0xelitesystem.github.io/">More tools</a>
+</footer>
+
+</div>
+<script>
+'use strict';
+
+/* ------------------------------------------------------------------ *
+ * Span Offset Debugger
+ * Four indexings of one string, axed by consuming system convention.
+ * ------------------------------------------------------------------ */
+
+var MAX_CHARS = 200000;
+var MAX_SPANS = 500;
+var AXIS_ORDER = ['utf16', 'codepoint', 'utf8', 'grapheme'];
+
+function buildAxisTable() {
+  var m = Object.create(null);
+  m.utf16 = {
+    key: 'utf16',
+    name: 'UTF-16 code units',
+    unit: 'UTF-16 code unit',
+    systems: 'JavaScript strings, DOM Range and CharacterData offsets, LSP default (utf-16), Java, .NET, Windows APIs'
+  };
+  m.codepoint = {
+    key: 'codepoint',
+    name: 'Unicode code points',
+    unit: 'code point',
+    systems: 'Python 3 str, Go runes, LSP utf-32, naive character counters'
+  };
+  m.utf8 = {
+    key: 'utf8',
+    name: 'UTF-8 bytes',
+    unit: 'UTF-8 byte',
+    systems: 'Rust str, byte-level tokenizers, protobuf string, regex over bytes, LSP utf-8'
+  };
+  m.grapheme = {
+    key: 'grapheme',
+    name: 'Grapheme clusters',
+    unit: 'grapheme cluster',
+    systems: 'what a reader sees, and what a redaction rectangle has to cover (UAX #29)'
+  };
+  return m;
+}
+var AXIS = buildAxisTable();
+
+function axisInfo(key) {
+  if (typeof key !== 'string') { return null; }
+  if (!Object.prototype.hasOwnProperty.call(AXIS, key)) { return null; }
+  return AXIS[key];
+}
+
+function isAxis(key) { return axisInfo(key) !== null; }
+
+/* ---------- small helpers ---------- */
+
+function pad4(n) {
+  var h = n.toString(16).toUpperCase();
+  while (h.length < 4) { h = '0' + h; }
+  return h;
+}
+function uPlus(cp) { return 'U+' + pad4(cp); }
+
+function utf8Len(cp) {
+  if (cp < 0x80) { return 1; }
+  if (cp < 0x800) { return 2; }
+  if (cp < 0x10000) { return 3; }
+  return 4;
+}
+
+/* Control characters and unpaired surrogates are shown as escapes so a
+   table cell stays readable. Paired surrogates and ZWJ are left alone so
+   real emoji still render. */
+function escapeVisible(s) {
+  var out = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c === 0x0A) { out += '\\n'; }
+    else if (c === 0x0D) { out += '\\r'; }
+    else if (c === 0x09) { out += '\\t'; }
+    else if (c < 0x20 || c === 0x7F) { out += '\\u' + pad4(c); }
+    else if (c === 0xFEFF) { out += '\\uFEFF'; }
+    else if (c >= 0xD800 && c <= 0xDBFF) {
+      var d = i + 1 < s.length ? s.charCodeAt(i + 1) : -1;
+      if (d >= 0xDC00 && d <= 0xDFFF) { out += s.charAt(i) + s.charAt(i + 1); i++; }
+      else { out += '\\u' + pad4(c); }
+    }
+    else if (c >= 0xDC00 && c <= 0xDFFF) { out += '\\u' + pad4(c); }
+    else { out += s.charAt(i); }
+  }
+  return out;
+}
+
+function signed(n) { return n > 0 ? '+' + n : String(n); }
+
+/* ---------- Intl.Segmenter availability: hard gate, no fallback ---------- */
+
+function segmenterAvailable(simulateMissing) {
+  if (simulateMissing) { return false; }
+  try {
+    if (typeof Intl === 'undefined') { return false; }
+    if (typeof Intl.Segmenter !== 'function') { return false; }
+    var s = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    var seen = 0;
+    var segs = s.segment('ab');
+    for (var part of segs) { if (typeof part.index !== 'number') { return false; } seen++; }
+    return seen === 2;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ---------- the index ---------- */
+
+function buildIndex(text, useSeg) {
+  var n = text.length;
+  var cpAt = new Int32Array(n + 1);
+  var byAt = new Int32Array(n + 1);
+  var cpB = new Uint8Array(n + 1);
+  var lone = [];
+  var c = 0, b = 0, i = 0, k;
+
+  while (i < n) {
+    cpB[i] = 1;
+    var p = text.codePointAt(i);
+    var sz = p > 0xFFFF ? 2 : 1;
+    var bl;
+    if (p >= 0xD800 && p <= 0xDFFF) {
+      /* Unpaired surrogate. TextEncoder substitutes U+FFFD, which is 3 bytes. */
+      bl = 3;
+      lone.push(i);
+    } else {
+      bl = utf8Len(p);
+    }
+    for (k = 0; k < sz; k++) { cpAt[i + k] = c; byAt[i + k] = b; }
+    c += 1; b += bl; i += sz;
+  }
+  cpAt[n] = c; byAt[n] = b; cpB[n] = 1;
+
+  var cpToU16 = new Int32Array(c + 1);
+  var byToU16 = new Int32Array(b + 1);
+  for (k = 0; k <= b; k++) { byToU16[k] = -1; }
+  for (var q = 0; q <= n; q++) {
+    if (cpB[q]) { cpToU16[cpAt[q]] = q; byToU16[byAt[q]] = q; }
+  }
+
+  var grStarts = null, grAt = null, grB = null, grCount = null;
+  if (useSeg) {
+    var seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    grStarts = [];
+    for (var part of seg.segment(text)) { grStarts.push(part.index); }
+    grCount = grStarts.length;
+    grStarts.push(n);
+    grAt = new Int32Array(n + 1);
+    grB = new Uint8Array(n + 1);
+    var gi = 0;
+    for (var t = 0; t < n; t++) {
+      while (gi + 1 < grStarts.length && grStarts[gi + 1] <= t) { gi++; }
+      grAt[t] = gi;
+      grB[t] = grStarts[gi] === t ? 1 : 0;
+    }
+    grAt[n] = grCount;
+    grB[n] = 1;
+  }
+
+  return {
+    text: text, n: n,
+    cpAt: cpAt, byAt: byAt, cpB: cpB,
+    cpToU16: cpToU16, byToU16: byToU16,
+    grStarts: grStarts, grAt: grAt, grB: grB,
+    segOK: !!useSeg,
+    lone: lone,
+    totals: { utf16: n, codepoint: c, utf8: b, grapheme: grCount }
+  };
+}
+
+function totalFor(ix, axis) {
+  if (axis === 'utf16') { return ix.totals.utf16; }
+  if (axis === 'codepoint') { return ix.totals.codepoint; }
+  if (axis === 'utf8') { return ix.totals.utf8; }
+  if (axis === 'grapheme') { return ix.totals.grapheme; }
+  return null;
+}
+
+/* Measure lengths only, used to price a transformation of the text. */
+function measureTotals(text, useSeg) {
+  var n = text.length, c = 0, b = 0, i = 0;
+  while (i < n) {
+    var p = text.codePointAt(i);
+    var sz = p > 0xFFFF ? 2 : 1;
+    b += (p >= 0xD800 && p <= 0xDFFF) ? 3 : utf8Len(p);
+    c += 1; i += sz;
+  }
+  var g = null;
+  if (useSeg) {
+    g = 0;
+    var seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    for (var part of seg.segment(text)) { if (part) { g++; } }
+  }
+  return { utf16: n, codepoint: c, utf8: b, grapheme: g };
+}
+
+/* ---------- axis conversion ---------- */
+
+function axisToU16(ix, axis, idx) {
+  var info = axisInfo(axis);
+  if (info === null) { return { ok: false, reason: 'unknown convention' }; }
+  if (!Number.isInteger(idx)) { return { ok: false, reason: 'offset is not an integer' }; }
+
+  if (axis === 'grapheme' && !ix.segOK) {
+    return { ok: false, unavailable: true, reason: 'the grapheme column is unavailable in this browser' };
+  }
+
+  var total = totalFor(ix, axis);
+  if (idx < 0 || idx > total) {
+    return {
+      ok: false,
+      reason: 'offset ' + idx + ' is outside this text, which is ' + total + ' ' + info.unit +
+        (total === 1 ? '' : 's') + ' long (valid offsets are 0 to ' + total + ')'
+    };
+  }
+
+  if (axis === 'utf16') {
+    if (!ix.cpB[idx]) {
+      var start = idx - 1;
+      var cp = ix.text.codePointAt(start);
+      return {
+        ok: false,
+        reason: 'offset ' + idx + ' is the low surrogate of the pair for ' + uPlus(cp) +
+          ', which occupies UTF-16 code units ' + start + ' and ' + idx +
+          '. Slicing here yields an unpaired surrogate, not a character.'
+      };
+    }
+    return { ok: true, u16: idx };
+  }
+
+  if (axis === 'codepoint') { return { ok: true, u16: ix.cpToU16[idx] }; }
+
+  if (axis === 'utf8') {
+    if (ix.byToU16[idx] < 0) {
+      var j = idx;
+      while (j > 0 && ix.byToU16[j] < 0) { j--; }
+      var u = ix.byToU16[j];
+      var cp2 = ix.text.codePointAt(u);
+      var uNext = u + (cp2 > 0xFFFF ? 2 : 1);
+      var blen = ix.byAt[uNext] - j;
+      return {
+        ok: false,
+        reason: 'offset ' + idx + ' is inside the ' + blen + '-byte UTF-8 sequence for ' + uPlus(cp2) +
+          ', which occupies bytes ' + j + ' to ' + (j + blen - 1) +
+          '. Rust panics on this; JavaScript would hand back a broken string.'
+      };
+    }
+    return { ok: true, u16: ix.byToU16[idx] };
+  }
+
+  return { ok: true, u16: ix.grStarts[idx] };
+}
+
+function u16ToAxis(ix, axis, u16) {
+  if (axis === 'utf16') { return { ok: true, idx: u16, aligned: true }; }
+  if (axis === 'grapheme') {
+    if (!ix.segOK) { return { ok: false, unavailable: true, reason: 'grapheme column unavailable in this browser' }; }
+    var g = ix.grAt[u16];
+    if (!ix.grB[u16]) {
+      return {
+        ok: true, idx: g, aligned: false,
+        cluster: [ix.grStarts[g], ix.grStarts[g + 1]]
+      };
+    }
+    return { ok: true, idx: g, aligned: true };
+  }
+  if (!ix.cpB[u16]) {
+    return { ok: false, reason: 'UTF-16 offset ' + u16 + ' is not on a code point boundary' };
+  }
+  if (axis === 'codepoint') { return { ok: true, idx: ix.cpAt[u16], aligned: true }; }
+  return { ok: true, idx: ix.byAt[u16], aligned: true };
+}
+
+/* ---------- span parsing ---------- */
+
+var SPAN_LINE = /^\[?\s*(-?\d{1,17})\s*[,;:\s]\s*(-?\d{1,17})\s*\]?\s*(?:[,;]\s*([^\r\n]{0,120}))?$/;
+
+function toInt(str) {
+  var v = Number(str);
+  if (!Number.isInteger(v)) { return null; }
+  if (!Number.isSafeInteger(v)) { return null; }
+  return v;
+}
+
+function pushNormalized(value, lineNo, out) {
+  var s = null, e = null, label = '';
+  if (Array.isArray(value)) {
+    if (value.length < 2) { out.errors.push({ line: lineNo, text: 'array of ' + value.length, msg: 'needs a start and an end' }); return; }
+    s = value[0]; e = value[1];
+    if (value.length > 2 && typeof value[2] === 'string') { label = value[2]; }
+  } else if (value !== null && typeof value === 'object') {
+    var has = Object.prototype.hasOwnProperty;
+    if (has.call(value, 'start')) { s = value.start; }
+    else if (has.call(value, 'begin')) { s = value.begin; }
+    if (has.call(value, 'end')) { e = value.end; }
+    if (has.call(value, 'label') && typeof value.label === 'string') { label = value.label; }
+  } else {
+    out.errors.push({ line: lineNo, text: String(value).slice(0, 60), msg: 'not a span' });
+    return;
+  }
+  if (typeof s !== 'number' || typeof e !== 'number' || !Number.isSafeInteger(s) || !Number.isSafeInteger(e)) {
+    out.errors.push({ line: lineNo, text: 'start=' + JSON.stringify(s) + ' end=' + JSON.stringify(e), msg: 'start and end must both be whole numbers within 2^53' });
+    return;
+  }
+  out.spans.push({ start: s, end: e, label: label.slice(0, 120), line: lineNo });
+}
+
+function parseSpans(raw) {
+  var out = { spans: [], errors: [], overflow: false };
+  if (typeof raw !== 'string') { return out; }
+  var trimmed = raw.trim();
+  if (trimmed === '') { return out; }
+
+  if (trimmed.charAt(0) === '[') {
+    var whole = null;
+    try { whole = JSON.parse(trimmed); } catch (e1) { whole = null; }
+    if (Array.isArray(whole) && whole.length > 0 && typeof whole[0] !== 'number') {
+      for (var w = 0; w < whole.length; w++) {
+        if (out.spans.length >= MAX_SPANS) { out.overflow = true; break; }
+        pushNormalized(whole[w], w + 1, out);
+      }
+      return out;
+    }
+  }
+
+  var lines = raw.split(/\r\n|\r|\n/);
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line === '') { continue; }
+    if (out.spans.length >= MAX_SPANS) { out.overflow = true; break; }
+    var lineNo = i + 1;
+    if (line.charAt(0) === '{' || line.charAt(0) === '[') {
+      var obj = null, bad = false;
+      try { obj = JSON.parse(line); } catch (e2) { bad = true; }
+      if (!bad) { pushNormalized(obj, lineNo, out); continue; }
+    }
+    var m = SPAN_LINE.exec(line);
+    if (!m) {
+      out.errors.push({ line: lineNo, text: line.slice(0, 80), msg: 'could not read a start and an end from this line' });
+      continue;
+    }
+    var s = toInt(m[1]);
+    var e = toInt(m[2]);
+    if (s === null || e === null) {
+      out.errors.push({ line: lineNo, text: line.slice(0, 80), msg: 'start or end is not a whole number within 2^53' });
+      continue;
+    }
+    out.spans.push({ start: s, end: e, label: (m[3] || '').trim().slice(0, 120), line: lineNo });
+  }
+  return out;
+}
+
+/* ---------- silent shifts ---------- */
+
+function entityTable() {
+  var m = Object.create(null);
+  m.amp = '&'; m.lt = '<'; m.gt = '>'; m.quot = '"'; m.apos = "'"; m.nbsp = '\u00A0';
+  return m;
+}
+var ENTITIES = entityTable();
+var ENTITY_RE = /&(#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/g;
+
+function decodeKnownEntities(text) {
+  ENTITY_RE.lastIndex = 0;
+  return text.replace(ENTITY_RE, function (whole, body) {
+    if (body.charAt(0) === '#') {
+      var isHex = body.charAt(1) === 'x' || body.charAt(1) === 'X';
+      var digits = isHex ? body.slice(2) : body.slice(1);
+      var code = parseInt(digits, isHex ? 16 : 10);
+      if (!Number.isInteger(code)) { return whole; }
+      if (code < 0 || code > 0x10FFFF) { return whole; }
+      if (code >= 0xD800 && code <= 0xDFFF) { return whole; }
+      return String.fromCodePoint(code);
+    }
+    if (Object.prototype.hasOwnProperty.call(ENTITIES, body)) { return ENTITIES[body]; }
+    return whole;
+  });
+}
+
+function offsetsOf(ix, u16) {
+  var parts = [];
+  parts.push('UTF-16 ' + u16);
+  if (ix.cpB[u16]) {
+    parts.push('code point ' + ix.cpAt[u16]);
+    parts.push('byte ' + ix.byAt[u16]);
+  }
+  if (ix.segOK) { parts.push('grapheme ' + ix.grAt[u16]); }
+  return parts.join(', ');
+}
+
+function deltaLine(before, after) {
+  var bits = [];
+  bits.push(signed(after.utf16 - before.utf16) + ' UTF-16');
+  bits.push(signed(after.codepoint - before.codepoint) + ' code points');
+  bits.push(signed(after.utf8 - before.utf8) + ' bytes');
+  if (before.grapheme !== null && after.grapheme !== null) {
+    bits.push(signed(after.grapheme - before.grapheme) + ' graphemes');
+  }
+  return bits.join(', ');
+}
+
+function firstDifference(a, b) {
+  var lim = Math.min(a.length, b.length);
+  for (var i = 0; i < lim; i++) { if (a.charCodeAt(i) !== b.charCodeAt(i)) { return i; } }
+  if (a.length !== b.length) { return lim; }
+  return -1;
+}
+
+function scanShifts(ix) {
+  var text = ix.text;
+  var before = { utf16: ix.totals.utf16, codepoint: ix.totals.codepoint, utf8: ix.totals.utf8, grapheme: ix.totals.grapheme };
+  var useSeg = ix.segOK;
+  var found = [];
+  var i;
+
+  /* 1. Byte order mark */
+  var bomAll = [];
+  for (i = 0; i < text.length; i++) { if (text.charCodeAt(i) === 0xFEFF) { bomAll.push(i); } }
+  if (bomAll.length > 0) {
+    var stripped = text.replace(/\uFEFF/g, '');
+    var shown = bomAll.slice(0, 5);
+    found.push({
+      title: 'U+FEFF byte order mark',
+      where: 'first at ' + offsetsOf(ix, bomAll[0]) +
+        (bomAll[0] === 0 ? ' (leading BOM)' : ' (not at the start, so it is a zero width no-break space in the middle of the text)'),
+      count: bomAll.length + ' occurrence' + (bomAll.length === 1 ? '' : 's') +
+        (bomAll.length > shown.length ? ', showing the first ' + shown.length + ' UTF-16 offsets: ' : ', at UTF-16 offsets: ') + shown.join(', '),
+      effect: 'If the consumer strips them, every offset after the first one moves by ' + deltaLine(before, measureTotals(stripped, useSeg)) + ' in total.'
+    });
+  }
+
+  /* 2. CRLF line endings */
+  var crlf = [];
+  for (i = 0; i + 1 < text.length; i++) { if (text.charCodeAt(i) === 0x0D && text.charCodeAt(i + 1) === 0x0A) { crlf.push(i); } }
+  if (crlf.length > 0) {
+    var lf = text.replace(/\r\n/g, '\n');
+    found.push({
+      title: 'CRLF line endings',
+      where: 'first at ' + offsetsOf(ix, crlf[0]),
+      count: crlf.length + ' CRLF pair' + (crlf.length === 1 ? '' : 's'),
+      effect: 'If the consumer normalises to LF, offsets after the first pair shift by one per preceding pair, ' + deltaLine(before, measureTotals(lf, useSeg)) + ' in total.'
+    });
+  }
+
+  /* 2b. LF only, which a textarea cannot distinguish from a stripped CR */
+  if (crlf.length === 0) {
+    var lf = [];
+    for (i = 0; i < text.length; i++) { if (text.charCodeAt(i) === 0x0A) { lf.push(i); } }
+    if (lf.length > 0) {
+      found.push({
+        title: 'Line breaks here are LF, not CRLF',
+        where: 'first LF at ' + offsetsOf(ix, lf[0]),
+        count: lf.length + ' LF line break' + (lf.length === 1 ? '' : 's') + ', no CR anywhere',
+        effect: 'A textarea cannot hand this page a carriage return: "The algorithm for obtaining the element\'s API value is to return the element\'s raw value, with newlines normalized." (WHATWG HTML, the textarea element). If the system that produced your offsets counted CRLF, tick the CRLF box above, because each line ending is then one more UTF-16 code unit, one more code point and one more byte than what is measured here.'
+      });
+    }
+  }
+
+  /* 3. NFC / NFD */
+  var nfc = null, nfd = null;
+  try { nfc = text.normalize('NFC'); nfd = text.normalize('NFD'); } catch (e) { nfc = null; nfd = null; }
+  if (nfc !== null && nfc !== text) {
+    var dc = firstDifference(text, nfc);
+    found.push({
+      title: 'Text is not in NFC',
+      where: dc >= 0 && dc < text.length ? 'first difference from its NFC form at ' + offsetsOf(ix, dc) : 'differs from its NFC form at the end of the text',
+      count: 'composed form is ' + nfc.length + ' UTF-16 code units against ' + text.length + ' here',
+      effect: 'A consumer that composes before indexing moves every later offset by ' + deltaLine(before, measureTotals(nfc, useSeg)) + ' in total.'
+    });
+  }
+  if (nfd !== null && nfd !== text) {
+    var dd = firstDifference(text, nfd);
+    found.push({
+      title: 'Text is not in NFD',
+      where: dd >= 0 && dd < text.length ? 'first difference from its NFD form at ' + offsetsOf(ix, dd) : 'differs from its NFD form at the end of the text',
+      count: 'decomposed form is ' + nfd.length + ' UTF-16 code units against ' + text.length + ' here',
+      effect: 'A consumer that decomposes before indexing moves every later offset by ' + deltaLine(before, measureTotals(nfd, useSeg)) + ' in total.'
+    });
+  }
+
+  /* 4. Undecoded HTML entities */
+  ENTITY_RE.lastIndex = 0;
+  var ents = [], mm;
+  while ((mm = ENTITY_RE.exec(text)) !== null) {
+    ents.push({ at: mm.index, raw: mm[0] });
+    if (ents.length >= 2000) { break; }
+  }
+  if (ents.length > 0) {
+    var decoded = decodeKnownEntities(text);
+    var changed = decoded !== text;
+    found.push({
+      title: 'HTML entity references still in the text',
+      where: 'first at ' + offsetsOf(ix, ents[0].at) + ', the sequence ' + ents[0].raw,
+      count: ents.length + ' entity-shaped sequence' + (ents.length === 1 ? '' : 's') + ' found',
+      effect: changed
+        ? 'Decoding the ones this page knows (amp, lt, gt, quot, apos, nbsp and numeric references) moves later offsets by ' + deltaLine(before, measureTotals(decoded, useSeg)) + ' in total. Any named entity outside that set is left alone here and would shift things further.'
+        : 'None of these are in the set this page decodes (amp, lt, gt, quot, apos, nbsp and numeric references), so no shift is measured. A full HTML entity decoder on the consumer side would still move later offsets.'
+    });
+  }
+
+  /* 5. Unpaired surrogates */
+  if (ix.lone.length > 0) {
+    var lshown = ix.lone.slice(0, 5);
+    found.push({
+      title: 'Unpaired surrogate code units',
+      where: 'first at UTF-16 offset ' + ix.lone[0],
+      count: ix.lone.length + ' unpaired surrogate' + (ix.lone.length === 1 ? '' : 's') +
+        (ix.lone.length > lshown.length ? ', showing the first ' + lshown.length + ': ' : ', at UTF-16 offsets: ') + lshown.join(', '),
+      effect: 'These are not encodable as UTF-8. The byte column counts each as the 3 bytes of U+FFFD, which is what TextEncoder substitutes, so byte offsets past the first one do not round-trip back to this exact string.'
+    });
+  }
+
+  return found;
+}
+
+/* ---------- analysis ---------- */
+
+function analyze(text, spanRaw, producer, consumer, opts) {
+  var res = {
+    fatal: null, notices: [], index: null, rows: [], lanes: null,
+    parseErrors: [], overflow: false, producer: producer, consumer: consumer,
+    converted: [], totals: null, shifts: []
+  };
+  if (!isAxis(producer) || !isAxis(consumer)) { res.fatal = 'Pick a producer and a consumer convention.'; return res; }
+  if (typeof text !== 'string' || text.length === 0) {
+    res.fatal = 'Paste some source text. With no text there is nothing to index.';
+    return res;
+  }
+  if (text.length > MAX_CHARS) {
+    res.fatal = 'This text is ' + text.length + ' UTF-16 code units. This page refuses above ' + MAX_CHARS +
+      ' so the four-way index stays interactive in a browser tab. Trim it, or run the conversion offline.';
+    return res;
+  }
+  if (text.trim() === '') {
+    res.notices.push({ kind: 'warn', text: 'The source text is ' + text.length + ' UTF-16 code units of whitespace only. The measurements below are real, but check you pasted what you meant to.' });
+  }
+
+  var segOK = opts && typeof opts.segOK === 'boolean' ? opts.segOK : segmenterAvailable(false);
+  var ix = buildIndex(text, segOK);
+  res.index = ix;
+  res.totals = ix.totals;
+  res.shifts = scanShifts(ix);
+
+  var parsed = parseSpans(spanRaw);
+  res.parseErrors = parsed.errors;
+  res.overflow = parsed.overflow;
+  if (parsed.overflow) {
+    res.notices.push({ kind: 'warn', text: 'Stopped after ' + MAX_SPANS + ' spans. The rows below cover the first ' + parsed.spans.length + ' only; nothing beyond that was read.' });
+  }
+  if (parsed.spans.length === 0) {
+    res.notices.push({ kind: 'warn', text: 'No spans read. The lengths and the silent-shift report below still apply to the text on its own.' });
+  }
+
+  var laneRanges = Object.create(null);
+  for (var a = 0; a < AXIS_ORDER.length; a++) { laneRanges[AXIS_ORDER[a]] = []; }
+
+  for (var i = 0; i < parsed.spans.length; i++) {
+    var sp = parsed.spans[i];
+    var row = { n: i + 1, span: sp, valid: true, problem: null, lanes: Object.create(null), correct: null, drift: null, naive: null };
+
+    if (sp.start < 0 || sp.end < 0) {
+      row.valid = false;
+      row.problem = 'Negative offsets (' + sp.start + ', ' + sp.end + '). Offsets are counted from zero and cannot be negative.';
+    } else if (sp.start > sp.end) {
+      row.valid = false;
+      row.problem = 'start ' + sp.start + ' is after end ' + sp.end + '. This page treats spans as [start, end) with end exclusive.';
+    }
+
+    for (var b = 0; b < AXIS_ORDER.length; b++) {
+      var ax = AXIS_ORDER[b];
+      if (!row.valid) { row.lanes[ax] = { ok: false, reason: row.problem }; continue; }
+      var rs = axisToU16(ix, ax, sp.start);
+      if (!rs.ok) { row.lanes[ax] = { ok: false, reason: 'start: ' + rs.reason, unavailable: !!rs.unavailable }; continue; }
+      var re = axisToU16(ix, ax, sp.end);
+      if (!re.ok) { row.lanes[ax] = { ok: false, reason: 'end: ' + re.reason, unavailable: !!re.unavailable }; continue; }
+      var lane = { ok: true, u16s: rs.u16, u16e: re.u16, text: text.slice(rs.u16, re.u16) };
+      row.lanes[ax] = lane;
+      laneRanges[ax].push({ s: rs.u16, e: re.u16, label: sp.label, n: i + 1 });
+    }
+
+    var prodLane = row.lanes[producer];
+    if (prodLane && prodLane.ok) {
+      var cs = u16ToAxis(ix, consumer, prodLane.u16s);
+      var ce = u16ToAxis(ix, consumer, prodLane.u16e);
+      if (cs.ok && ce.ok) {
+        row.correct = {
+          start: cs.idx, end: ce.idx,
+          aligned: cs.aligned !== false && ce.aligned !== false,
+          startCluster: cs.cluster || null,
+          endCluster: ce.cluster || null
+        };
+        row.drift = { start: cs.idx - sp.start, end: ce.idx - sp.end };
+      } else {
+        row.correct = null;
+        row.correctProblem = (cs.ok ? '' : 'start: ' + cs.reason) + (ce.ok ? '' : (cs.ok ? '' : ' / ') + 'end: ' + ce.reason);
+      }
+    }
+    var naiveLane = row.lanes[consumer];
+    if (naiveLane && naiveLane.ok) { row.naive = naiveLane.text; }
+    else if (naiveLane) { row.naiveProblem = naiveLane.reason; }
+
+    res.rows.push(row);
+  }
+
+  res.lanes = laneRanges;
+
+  for (var r = 0; r < res.rows.length; r++) {
+    var rr = res.rows[r];
+    if (rr.correct && rr.correct.aligned) {
+      var obj = { start: rr.correct.start, end: rr.correct.end };
+      if (rr.span.label) { obj.label = rr.span.label; }
+      res.converted.push(obj);
+    }
+  }
+
+  return res;
+}
+
+/* ---------- DOM ---------- */
+
+function el(tag, cls, txt) {
+  var e = document.createElement(tag);
+  if (cls) { e.className = cls; }
+  if (txt !== undefined && txt !== null) { e.textContent = txt; }
+  return e;
+}
+function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+
+var UI = {};
+var state = { segOK: true, lastConverted: [], lastConvertedText: '' };
+
+function mergeRanges(list, n) {
+  var arr = list.slice().sort(function (x, y) { return x.s - y.s || x.e - y.e; });
+  var out = [];
+  var lastEnd = 0;
+  for (var i = 0; i < arr.length; i++) {
+    var s = Math.max(arr[i].s, lastEnd);
+    var e = arr[i].e;
+    if (e > n) { e = n; }
+    if (s > e) { s = e; }
+    out.push({ s: s, e: e, label: arr[i].label, n: arr[i].n });
+    if (e > lastEnd) { lastEnd = e; }
+  }
+  return out;
+}
+
+function renderLane(axisKey, ranges, ix, res) {
+  var info = axisInfo(axisKey);
+  var wrap = el('section', 'lane lane-' + axisKey);
+  var head = el('div', 'lane-head');
+  var nm = el('span', 'lane-name', info.name);
+  head.appendChild(nm);
+
+  if (axisKey === 'grapheme' && !ix.segOK) {
+    var chip = el('span', 'chip bad', 'unavailable in this browser');
+    head.appendChild(chip);
+  }
+  head.appendChild(el('span', 'lane-sys', info.systems));
+  wrap.appendChild(head);
+
+  if (axisKey === 'grapheme' && !ix.segOK) {
+    var m = el('div', 'lane-verdict');
+    m.textContent = 'Intl.Segmenter is not available here, so this column computes nothing. There is no regex fallback on purpose: a regex approximation of grapheme clusters is wrong for exactly the ZWJ sequences, flag pairs and skin-tone modifiers this column exists for, which is the bug class this page is built to find. Open this page in a browser with Intl.Segmenter to fill this column in.';
+    wrap.appendChild(m);
+    return wrap;
+  }
+
+  var body = el('div', 'lane-text');
+  var text = ix.text;
+  var merged = mergeRanges(ranges, ix.n);
+  var pos = 0;
+  for (var i = 0; i < merged.length; i++) {
+    var r = merged[i];
+    if (r.s > pos) { body.appendChild(document.createTextNode(text.slice(pos, r.s))); }
+    var mk = document.createElement('mark');
+    if (r.e === r.s) { mk.className = 'caret'; mk.textContent = ''; }
+    else { mk.textContent = text.slice(r.s, r.e); }
+    mk.setAttribute('title', 'span ' + r.n + (r.label ? ': ' + r.label : '') + ' as ' + info.name);
+    body.appendChild(mk);
+    pos = r.e;
+  }
+  if (pos < text.length) { body.appendChild(document.createTextNode(text.slice(pos))); }
+  if (text.length === 0) { body.appendChild(el('span', 'sub', '(empty text)')); }
+  wrap.appendChild(body);
+
+  var verdict = el('div', 'lane-verdict');
+  var lines = [];
+  for (var k = 0; k < res.rows.length; k++) {
+    var row = res.rows[k];
+    var lane = row.lanes[axisKey];
+    var tag = 'span ' + row.n + (row.span.label ? ' (' + row.span.label + ')' : '') + ' [' + row.span.start + ', ' + row.span.end + ') ';
+    if (lane && lane.ok) {
+      lines.push(tag + 'selects ' + JSON.stringify(escapeVisible(lane.text)));
+    } else if (lane) {
+      lines.push(tag + 'cannot be read here. ' + lane.reason);
+    }
+  }
+  verdict.textContent = lines.length ? lines.join('  |  ') : 'No spans to place in this text.';
+  wrap.appendChild(verdict);
+  return wrap;
+}
+
+function renderLanes(res) {
+  var host = UI.lanes;
+  clear(host);
+  if (!res.index) { return; }
+  for (var i = 0; i < AXIS_ORDER.length; i++) {
+    var ax = AXIS_ORDER[i];
+    host.appendChild(renderLane(ax, res.lanes[ax] || [], res.index, res));
+  }
+}
+
+function cell(row, txt, cls) {
+  var td = el('td', cls || null, txt);
+  row.appendChild(td);
+  return td;
+}
+
+function renderDrift(res) {
+  var host = UI.driftArea;
+  clear(host);
+
+  if (res.rows.length === 0) {
+    host.appendChild(el('div', 'msg', 'No spans entered, so there is no drift to report.'));
+    return;
+  }
+
+  var pInfo = axisInfo(res.producer), cInfo = axisInfo(res.consumer);
+  if (res.producer === res.consumer) {
+    host.appendChild(el('div', 'msg ok', 'Producer and consumer are both ' + pInfo.name + ', so no conversion is needed. The table is a boundary check: it still refuses any offset that does not land on a real boundary in this text.'));
+  } else {
+    host.appendChild(el('div', 'msg', 'Reading ' + pInfo.name + ' offsets into a system that counts ' + cInfo.name + '.'));
+  }
+
+  var wrapT = el('div', 'tablewrap');
+  var table = el('table');
+  var thead = el('thead');
+  var hr = el('tr');
+  ['#', 'Label', 'Raw span', 'Producer selects', 'Correct for consumer', 'Drift', 'Consumer with raw numbers'].forEach(function (h, idx) {
+    var th = el('th', idx === 0 || idx === 5 ? 'num' : null, h);
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  var tbody = el('tbody');
+
+  for (var i = 0; i < res.rows.length; i++) {
+    var row = res.rows[i];
+    var tr = el('tr');
+    cell(tr, String(row.n), 'num');
+    cell(tr, row.span.label || '-');
+    cell(tr, '[' + row.span.start + ', ' + row.span.end + ')');
+
+    var pLane = row.lanes[res.producer];
+    if (pLane && pLane.ok) { cell(tr, JSON.stringify(escapeVisible(pLane.text))); }
+    else { cell(tr, pLane ? pLane.reason : 'not resolved'); }
+
+    if (row.correct) {
+      var txt = '[' + row.correct.start + ', ' + row.correct.end + ')';
+      if (!row.correct.aligned) {
+        var extra = [];
+        if (row.correct.startCluster) { extra.push('start cuts the cluster at UTF-16 ' + row.correct.startCluster[0] + ' to ' + row.correct.startCluster[1]); }
+        if (row.correct.endCluster) { extra.push('end cuts the cluster at UTF-16 ' + row.correct.endCluster[0] + ' to ' + row.correct.endCluster[1]); }
+        txt += ' - not on a boundary: ' + extra.join('; ') + '. Expand to the cluster edges to cover it.';
+      }
+      cell(tr, txt);
+    } else if (row.correctProblem) {
+      cell(tr, row.correctProblem);
+    } else {
+      cell(tr, 'not computed: the producer could not read this span');
+    }
+
+    if (row.drift) {
+      cell(tr, signed(row.drift.start) + ' / ' + signed(row.drift.end), 'num');
+    } else {
+      cell(tr, '-', 'num');
+    }
+
+    if (row.naive !== null && row.naive !== undefined) {
+      cell(tr, JSON.stringify(escapeVisible(row.naive)));
+    } else if (row.naiveProblem) {
+      cell(tr, row.naiveProblem);
+    } else {
+      cell(tr, '-');
+    }
+
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrapT.appendChild(table);
+  host.appendChild(wrapT);
+
+  var mismatched = 0, unreadable = 0;
+  for (var j = 0; j < res.rows.length; j++) {
+    var rr = res.rows[j];
+    if (rr.drift && (rr.drift.start !== 0 || rr.drift.end !== 0)) { mismatched++; }
+    if (!rr.correct) { unreadable++; }
+  }
+  var summary = 'In the text you pasted, ' + mismatched + ' of ' + res.rows.length + ' span' +
+    (res.rows.length === 1 ? '' : 's') + ' need renumbering to survive the handoff' +
+    (unreadable > 0 ? ', and ' + unreadable + ' could not be read at all under the producer convention.' : '.');
+  host.appendChild(el('div', mismatched > 0 || unreadable > 0 ? 'msg warn' : 'msg ok', summary));
+}
+
+function renderConverted(res) {
+  var cInfo = axisInfo(res.consumer);
+  if (res.converted.length === 0) {
+    state.lastConvertedText = '';
+    UI.convOut.textContent = 'Nothing to convert yet. A span appears here once it resolves under the producer convention and lands on a real boundary under the consumer convention.';
+    UI.convNote.textContent = 'Converted output is empty.';
+    UI.copyBtn.disabled = true;
+    return;
+  }
+  var json = JSON.stringify(res.converted, null, 2);
+  state.lastConvertedText = json;
+  UI.convOut.textContent = json;
+  UI.convNote.textContent = res.converted.length + ' of ' + res.rows.length + ' span' +
+    (res.rows.length === 1 ? '' : 's') + ' expressed in ' + cInfo.name + ', end exclusive.';
+  UI.copyBtn.disabled = false;
+}
+
+function renderShifts(res) {
+  var host = UI.shiftArea;
+  clear(host);
+  if (!res.index) { return; }
+  if (res.shifts.length === 0) {
+    host.appendChild(el('div', 'msg ok', 'No BOM, no CRLF, already in NFC and NFD, no entity references, no unpaired surrogates. Nothing in this text shifts an offset silently.'));
+    return;
+  }
+  var wrapT = el('div', 'tablewrap');
+  var table = el('table');
+  var thead = el('thead');
+  var hr = el('tr');
+  ['Cause', 'Where the shift starts', 'How many', 'Measured effect'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  var tbody = el('tbody');
+  for (var i = 0; i < res.shifts.length; i++) {
+    var s = res.shifts[i];
+    var tr = el('tr');
+    cell(tr, s.title);
+    cell(tr, s.where);
+    cell(tr, s.count);
+    cell(tr, s.effect);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrapT.appendChild(table);
+  host.appendChild(wrapT);
+}
+
+function renderTotals(res) {
+  var body = UI.totalsBody;
+  clear(body);
+  if (!res.index) { return; }
+  for (var i = 0; i < AXIS_ORDER.length; i++) {
+    var ax = AXIS_ORDER[i];
+    var info = axisInfo(ax);
+    var tr = el('tr');
+    cell(tr, info.name);
+    var v = totalFor(res.index, ax);
+    if (v === null) { cell(tr, 'unavailable', 'num'); }
+    else { cell(tr, String(v), 'num'); }
+    cell(tr, ax === 'grapheme' && v === null ? 'Intl.Segmenter missing, so this row is not computed' : info.systems);
+    body.appendChild(tr);
+  }
+}
+
+function renderMessages(res) {
+  var host = UI.messages;
+  clear(host);
+  if (res.fatal) {
+    host.appendChild(el('div', 'msg err', res.fatal));
+    return;
+  }
+  for (var i = 0; i < res.notices.length; i++) {
+    host.appendChild(el('div', 'msg ' + res.notices[i].kind, res.notices[i].text));
+  }
+  if (res.parseErrors.length > 0) {
+    var box = el('div', 'msg err');
+    box.appendChild(el('strong', null, res.parseErrors.length + ' span line' + (res.parseErrors.length === 1 ? '' : 's') + ' could not be read:'));
+    var ul = el('ul');
+    var lim = Math.min(res.parseErrors.length, 10);
+    for (var j = 0; j < lim; j++) {
+      var pe = res.parseErrors[j];
+      ul.appendChild(el('li', null, 'line ' + pe.line + ': ' + pe.msg + ' -> ' + JSON.stringify(pe.text)));
+    }
+    box.appendChild(ul);
+    if (res.parseErrors.length > lim) {
+      box.appendChild(el('div', null, 'Showing ' + lim + ' of ' + res.parseErrors.length + '.'));
+    }
+    host.appendChild(box);
+  }
+  if (!res.index) { return; }
+  if (!res.index.segOK) {
+    host.appendChild(el('div', 'msg warn', 'Intl.Segmenter is unavailable, so the grapheme column is switched off entirely. It is not approximated.'));
+  }
+}
+
+function blankResults() {
+  clear(UI.lanes);
+  clear(UI.driftArea);
+  clear(UI.shiftArea);
+  clear(UI.totalsBody);
+  UI.convOut.textContent = 'Nothing to convert yet.';
+  UI.convNote.textContent = '';
+  UI.copyBtn.disabled = true;
+  state.lastConvertedText = '';
+}
+
+/* A textarea normalises every line break to LF, so CRLF has to be declared. */
+function toCRLF(s) {
+  return s.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\r\n');
+}
+
+function run() {
+  var text = UI.srcText.value;
+  if (UI.crlfBox.checked) { text = toCRLF(text); }
+  var spans = UI.spanText.value;
+  var producer = UI.producer.value;
+  var consumer = UI.consumer.value;
+  var segOK = segmenterAvailable(UI.simNoSeg.checked);
+  state.segOK = segOK;
+  syncAxisOptions(segOK);
+  producer = UI.producer.value;
+  consumer = UI.consumer.value;
+
+  var res;
+  try {
+    res = analyze(text, spans, producer, consumer, { segOK: segOK });
+  } catch (err) {
+    blankResults();
+    clear(UI.messages);
+    UI.messages.appendChild(el('div', 'msg err', 'This input could not be processed: ' + (err && err.message ? err.message : 'unknown error') + '. Try a smaller text.'));
+    return;
+  }
+
+  renderMessages(res);
+  if (res.fatal) { blankResults(); return; }
+  renderLanes(res);
+  renderDrift(res);
+  renderConverted(res);
+  renderShifts(res);
+  renderTotals(res);
+  UI.copyStatus.textContent = '';
+}
+
+function syncAxisOptions(segOK) {
+  var sels = [UI.producer, UI.consumer];
+  for (var i = 0; i < sels.length; i++) {
+    var sel = sels[i];
+    for (var j = 0; j < sel.options.length; j++) {
+      var opt = sel.options[j];
+      if (opt.value === 'grapheme') {
+        opt.disabled = !segOK;
+        opt.textContent = axisInfo('grapheme').name + (segOK ? '' : ' (unavailable here)');
+      }
+    }
+    if (!segOK && sel.value === 'grapheme') { sel.value = 'utf16'; }
+  }
+}
+
+function fillSelects() {
+  var sels = [UI.producer, UI.consumer];
+  for (var i = 0; i < sels.length; i++) {
+    for (var j = 0; j < AXIS_ORDER.length; j++) {
+      var info = axisInfo(AXIS_ORDER[j]);
+      var opt = document.createElement('option');
+      opt.value = info.key;
+      opt.textContent = info.name;
+      sels[i].appendChild(opt);
+    }
+  }
+  UI.producer.value = 'utf8';
+  UI.consumer.value = 'utf16';
+}
+
+/* ---------- examples ---------- */
+
+var EXAMPLES = (function () {
+  var m = Object.create(null);
+  m.a = {
+    text: 'Caf\u00E9 order #4417: refund Zo\u00EB \uD83D\uDC69\u200D\uD83D\uDCBB Muller, card 4242.',
+    spans: '43, 49, surname',
+    producer: 'utf8',
+    consumer: 'utf16',
+    crlf: false
+  };
+  m.b = {
+    text: 'a\uD801\uDC00b',
+    spans: '2, 3, the letter b',
+    producer: 'codepoint',
+    consumer: 'utf16',
+    crlf: false
+  };
+  m.c = {
+    text: '\uFEFFInvoice &amp; refund\r\nName: Zoe\u0308 Muller\r\nCard: 4242\r\n',
+    spans: '34, 40, surname',
+    producer: 'utf16',
+    consumer: 'utf8',
+    crlf: true
+  };
+  return m;
+})();
+
+function loadExample(key) {
+  if (!Object.prototype.hasOwnProperty.call(EXAMPLES, key)) { return; }
+  var ex = EXAMPLES[key];
+  UI.srcText.value = ex.text;
+  UI.spanText.value = ex.spans;
+  UI.simNoSeg.checked = false;
+  UI.crlfBox.checked = ex.crlf === true;
+  syncAxisOptions(segmenterAvailable(false));
+  UI.producer.value = ex.producer;
+  UI.consumer.value = ex.consumer;
+  run();
+}
+
+/* ---------- theme ---------- */
+
+function currentTheme() {
+  var t = document.documentElement.getAttribute('data-theme');
+  return t === 'light' ? 'light' : 'dark';
+}
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  UI.themeBtn.textContent = t === 'dark' ? 'Light theme' : 'Dark theme';
+  try { localStorage.setItem('sod-theme', t); } catch (e) { /* storage blocked, theme is per-session */ }
+}
+
+/* ---------- copy ---------- */
+
+function copyConverted() {
+  var txt = state.lastConvertedText;
+  if (typeof txt !== 'string' || txt === '') {
+    UI.copyStatus.textContent = 'Nothing to copy.';
+    return;
+  }
+  var done = function () { UI.copyStatus.textContent = 'Copied ' + txt.length + ' characters.'; };
+  var failed = function () { UI.copyStatus.textContent = 'Clipboard blocked here. Select the block above and copy it.'; };
+  try {
+    if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(txt).then(done, failed);
+      return;
+    }
+  } catch (e) { /* fall through */ }
+  failed();
+}
+
+/* ---------- wiring ---------- */
+
+function init() {
+  UI.srcText = document.getElementById('srcText');
+  UI.spanText = document.getElementById('spanText');
+  UI.producer = document.getElementById('producer');
+  UI.consumer = document.getElementById('consumer');
+  UI.simNoSeg = document.getElementById('simNoSeg');
+  UI.crlfBox = document.getElementById('crlfBox');
+  UI.messages = document.getElementById('messages');
+  UI.lanes = document.getElementById('lanes');
+  UI.driftArea = document.getElementById('driftArea');
+  UI.shiftArea = document.getElementById('shiftArea');
+  UI.totalsBody = document.getElementById('totalsBody');
+  UI.convOut = document.getElementById('convOut');
+  UI.convNote = document.getElementById('convNote');
+  UI.copyBtn = document.getElementById('copyBtn');
+  UI.copyStatus = document.getElementById('copyStatus');
+  UI.themeBtn = document.getElementById('themeBtn');
+
+  fillSelects();
+  UI.themeBtn.textContent = currentTheme() === 'dark' ? 'Light theme' : 'Dark theme';
+  UI.themeBtn.addEventListener('click', function () {
+    applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+  });
+
+  UI.srcText.addEventListener('input', run);
+  UI.spanText.addEventListener('input', run);
+  UI.producer.addEventListener('change', run);
+  UI.consumer.addEventListener('change', run);
+  UI.simNoSeg.addEventListener('change', run);
+  UI.crlfBox.addEventListener('change', run);
+  UI.copyBtn.addEventListener('click', copyConverted);
+
+  document.getElementById('exA').addEventListener('click', function () { loadExample('a'); });
+  document.getElementById('exB').addEventListener('click', function () { loadExample('b'); });
+  document.getElementById('exC').addEventListener('click', function () { loadExample('c'); });
+  document.getElementById('clearBtn').addEventListener('click', function () {
+    UI.srcText.value = '';
+    UI.spanText.value = '';
+    run();
+  });
+
+  loadExample('a');
+}
+
+if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+  init();
+}
+</script>
+</body>
+</html>
