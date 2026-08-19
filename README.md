@@ -62,7 +62,7 @@ A byte-level model returns `start 43, end 49` for the customer surname. Hand tho
 
 The redaction case is the one worth staring at. A rectangle drawn over grapheme clusters 43 to 49 blacks out part of the card number and leaves the surname legible. Nothing raised an error anywhere. The correct span in each convention is UTF-16 `[35, 41)`, code points `[33, 39)`, graphemes `[31, 37)`, so handing byte offsets straight to the JavaScript UI drifts both ends by -8.
 
-A second example reproduces the string from the LSP spec, `a` U+10400 `b`, where the offset of `b` is 2 counted in code points and 3 counted in UTF-16, and shows what the page does when a span starts on the low surrogate. A third example carries a BOM, CRLF line endings, an NFD name and an undecoded `&amp;` at the same time, and loads with the CRLF box already ticked.
+A second example reproduces the string from the LSP spec, `a` U+10400 `b`, where the offset of `b` is 2 counted in code points and 3 counted in UTF-16, and shows what the page does when a span starts on the low surrogate: it names the pair and refuses, rather than returning half a character. A third example carries a BOM, CRLF line endings, an NFD name and an undecoded `&amp;` at the same time, and loads with the CRLF box already ticked.
 
 ## Why this exists
 

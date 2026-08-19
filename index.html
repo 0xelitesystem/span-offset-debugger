@@ -250,7 +250,7 @@ footer { margin-top: 2.6rem; border-top: 1px solid var(--rule); padding-top: 0.9
 </div>
 
 <h2>Silent shifts in this text</h2>
-<p class="sub">Four things move every offset after them and raise nothing. Each one below is reported with the offset where the shift begins and the measured length change, rather than a bare note that two lengths differ.</p>
+<p class="sub">Some things move every offset after them and raise nothing. Each one below is reported with the offset where the shift begins and the measured length change, rather than a bare note that two lengths differ.</p>
 <div id="shiftArea"></div>
 
 <h2>This text measured four ways</h2>
@@ -730,13 +730,13 @@ function scanShifts(ix) {
 
   /* 2b. LF only, which a textarea cannot distinguish from a stripped CR */
   if (crlf.length === 0) {
-    var lf = [];
-    for (i = 0; i < text.length; i++) { if (text.charCodeAt(i) === 0x0A) { lf.push(i); } }
-    if (lf.length > 0) {
+    var lfAll = [];
+    for (i = 0; i < text.length; i++) { if (text.charCodeAt(i) === 0x0A) { lfAll.push(i); } }
+    if (lfAll.length > 0) {
       found.push({
         title: 'Line breaks here are LF, not CRLF',
-        where: 'first LF at ' + offsetsOf(ix, lf[0]),
-        count: lf.length + ' LF line break' + (lf.length === 1 ? '' : 's') + ', no CR anywhere',
+        where: 'first LF at ' + offsetsOf(ix, lfAll[0]),
+        count: lfAll.length + ' LF line break' + (lfAll.length === 1 ? '' : 's') + ', no CR anywhere',
         effect: 'A textarea cannot hand this page a carriage return: "The algorithm for obtaining the element\'s API value is to return the element\'s raw value, with newlines normalized." (WHATWG HTML, the textarea element). If the system that produced your offsets counted CRLF, tick the CRLF box above, because each line ending is then one more UTF-16 code unit, one more code point and one more byte than what is measured here.'
       });
     }
