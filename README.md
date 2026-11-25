@@ -106,7 +106,7 @@ No build. One HTML file with inline CSS and JavaScript. No dependencies, no bund
 
 Those are about characters. This one is about spans, which is a different failure.
 
-- [unicode-character-inspector](https://github.com/0xelitesystem/unicode-character-inspector), what a single character is: code point, name, encodings
+- [unicode-codepoint-breakdown](https://github.com/0xelitesystem/unicode-codepoint-breakdown), what a single character is: code point, name, encodings
 - [unicode-and-normalization-reference](https://github.com/0xelitesystem/unicode-and-normalization-reference), NFC, NFD, and why two strings that look identical compare unequal
 - [character-encoding-utf8-basics-reference](https://github.com/0xelitesystem/character-encoding-utf8-basics-reference), what UTF-8 is and how a code point is laid out in bytes
 
